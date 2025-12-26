@@ -1211,7 +1211,7 @@ static void lo_remap_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
 				unsigned int remap_flags)
 {
 	int res;
-	struct file_clone_range range;
+	size_t cloned_len;
 
 	(void)ino_in;
 	(void)ino_out;
@@ -1225,17 +1225,36 @@ static void lo_remap_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
 			(unsigned long long)fi_out->fh, (intmax_t)off_out,
 			len, remap_flags);
 
-	/* Use FICLONERANGE ioctl for the actual remap */
-	range.src_fd = fi_in->fh;
-	range.src_offset = off_in;
-	range.src_length = len;
-	range.dest_offset = off_out;
+	if (len == 0 && off_in == 0 && off_out == 0 && remap_flags == 0) {
+		/* Whole-file clone: use FICLONE (simpler, faster) */
+		res = ioctl((int)fi_out->fh, FICLONE, (int)fi_in->fh);
+	} else {
+		/* Partial clone: use FICLONERANGE */
+		struct file_clone_range range;
+		range.src_fd = fi_in->fh;
+		range.src_offset = off_in;
+		range.src_length = len;
+		range.dest_offset = off_out;
+		res = ioctl((int)fi_out->fh, FICLONERANGE, &range);
+	}
 
-	res = ioctl(fi_out->fh, FICLONERANGE, &range);
-	if (res < 0)
+	if (res < 0) {
 		fuse_reply_err(req, errno);
-	else
-		fuse_reply_write(req, len);
+		return;
+	}
+
+	/* For whole-file clone (len=0), get actual size from source file */
+	if (len == 0) {
+		struct stat st;
+		if (fstat((int)fi_in->fh, &st) == 0)
+			cloned_len = st.st_size;
+		else
+			cloned_len = 0;
+	} else {
+		cloned_len = len;
+	}
+
+	fuse_reply_write(req, cloned_len);
 }
 
 static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
