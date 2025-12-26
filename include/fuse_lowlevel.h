@@ -1341,6 +1341,39 @@ struct fuse_lowlevel_ops {
 	 */
 	void (*statx)(fuse_req_t req, fuse_ino_t ino, int flags, int mask,
 		      struct fuse_file_info *fi);
+
+	/**
+	 * Remap file range (for FICLONE/FICLONERANGE support)
+	 *
+	 * This is called when the application uses the FICLONE or
+	 * FICLONERANGE ioctls (which call remap_file_range internally).
+	 * This allows creating reflinks (copy-on-write clones) of files
+	 * on filesystems that support it (like btrfs).
+	 *
+	 * If this request is answered with an error code of ENOSYS, this is
+	 * treated as a permanent failure with error code EOPNOTSUPP, i.e. all
+	 * future remap_file_range() requests will fail with EOPNOTSUPP without
+	 * being sent to the filesystem process.
+	 *
+	 * Valid replies:
+	 *   fuse_reply_write
+	 *   fuse_reply_err
+	 *
+	 * @param req request handle
+	 * @param ino_in the inode number of the source file
+	 * @param off_in starting point from where to read
+	 * @param fi_in file information of the source file
+	 * @param ino_out the inode number of the destination file
+	 * @param off_out starting point where to write
+	 * @param fi_out file information of the destination file
+	 * @param len length of range to remap (0 means to EOF)
+	 * @param remap_flags REMAP_FILE_DEDUP or REMAP_FILE_CAN_SHORTEN
+	 */
+	void (*remap_file_range) (fuse_req_t req, fuse_ino_t ino_in,
+				  off_t off_in, struct fuse_file_info *fi_in,
+				  fuse_ino_t ino_out, off_t off_out,
+				  struct fuse_file_info *fi_out, size_t len,
+				  unsigned int remap_flags);
 };
 
 /**

@@ -1200,6 +1200,44 @@ static void lo_copy_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
 }
 #endif
 
+/* FICLONERANGE ioctl for remap_file_range */
+#include <sys/ioctl.h>
+#include <linux/fs.h>
+
+static void lo_remap_file_range(fuse_req_t req, fuse_ino_t ino_in, off_t off_in,
+				struct fuse_file_info *fi_in,
+				fuse_ino_t ino_out, off_t off_out,
+				struct fuse_file_info *fi_out, size_t len,
+				unsigned int remap_flags)
+{
+	int res;
+	struct file_clone_range range;
+
+	(void)ino_in;
+	(void)ino_out;
+
+	if (lo_debug(req))
+		fuse_log(FUSE_LOG_DEBUG,
+			"%s(ino=%lld fd=%lld off=%jd ino=%lld fd=%lld off=%jd, size=%zd, flags=0x%x)\n",
+			__func__, (unsigned long long)ino_in,
+			(unsigned long long)fi_in->fh,
+			(intmax_t)off_in, (unsigned long long)ino_out,
+			(unsigned long long)fi_out->fh, (intmax_t)off_out,
+			len, remap_flags);
+
+	/* Use FICLONERANGE ioctl for the actual remap */
+	range.src_fd = fi_in->fh;
+	range.src_offset = off_in;
+	range.src_length = len;
+	range.dest_offset = off_out;
+
+	res = ioctl(fi_out->fh, FICLONERANGE, &range);
+	if (res < 0)
+		fuse_reply_err(req, errno);
+	else
+		fuse_reply_write(req, len);
+}
+
 static void lo_lseek(fuse_req_t req, fuse_ino_t ino, off_t off, int whence,
 		     struct fuse_file_info *fi)
 {
@@ -1278,6 +1316,7 @@ static const struct fuse_lowlevel_ops lo_oper = {
 #ifdef HAVE_STATX
 	.statx		= lo_statx,
 #endif
+	.remap_file_range = lo_remap_file_range,
 };
 
 int main(int argc, char *argv[])

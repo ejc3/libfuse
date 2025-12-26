@@ -2488,6 +2488,33 @@ static void do_copy_file_range_64(fuse_req_t req, const fuse_ino_t nodeid_in,
 	_do_copy_file_range_64(req, nodeid_in, inarg, NULL);
 }
 
+static void _do_remap_file_range(fuse_req_t req, const fuse_ino_t nodeid_in,
+				 const void *op_in, const void *in_payload)
+{
+	(void) in_payload;
+	const struct fuse_remap_file_range_in *arg = op_in;
+	struct fuse_file_info fi_in, fi_out;
+
+	memset(&fi_in, 0, sizeof(fi_in));
+	fi_in.fh = arg->fh_in;
+
+	memset(&fi_out, 0, sizeof(fi_out));
+	fi_out.fh = arg->fh_out;
+
+	if (req->se->op.remap_file_range)
+		req->se->op.remap_file_range(req, nodeid_in, arg->off_in, &fi_in,
+					     arg->nodeid_out, arg->off_out,
+					     &fi_out, arg->len, arg->remap_flags);
+	else
+		fuse_reply_err(req, ENOSYS);
+}
+
+static void do_remap_file_range(fuse_req_t req, const fuse_ino_t nodeid_in,
+				const void *inarg)
+{
+	_do_remap_file_range(req, nodeid_in, inarg, NULL);
+}
+
 /*
  * Note that the uint64_t offset in struct fuse_lseek_in is derived from
  * linux kernel loff_t and is therefore signed.
@@ -3444,6 +3471,7 @@ static struct {
 	[FUSE_RENAME2]     = { do_rename2,      "RENAME2"    },
 	[FUSE_COPY_FILE_RANGE] = { do_copy_file_range, "COPY_FILE_RANGE" },
 	[FUSE_COPY_FILE_RANGE_64] = { do_copy_file_range_64, "COPY_FILE_RANGE_64" },
+	[FUSE_REMAP_FILE_RANGE] = { do_remap_file_range, "REMAP_FILE_RANGE" },
 	[FUSE_LSEEK]	   = { do_lseek,       "LSEEK"	     },
 	[FUSE_STATX]	   = { do_statx,       "STATX"	     },
 	[CUSE_INIT]	   = { cuse_lowlevel_init, "CUSE_INIT"   },
@@ -3500,6 +3528,7 @@ static struct {
 	[FUSE_RENAME2]		= { _do_rename2,	"RENAME2" },
 	[FUSE_COPY_FILE_RANGE]	= { _do_copy_file_range, "COPY_FILE_RANGE" },
 	[FUSE_COPY_FILE_RANGE_64]	= { _do_copy_file_range_64, "COPY_FILE_RANGE_64" },
+	[FUSE_REMAP_FILE_RANGE]	= { _do_remap_file_range, "REMAP_FILE_RANGE" },
 	[FUSE_LSEEK]		= { _do_lseek,		"LSEEK" },
 	[FUSE_STATX]		= { _do_statx,		"STATX" },
 	[CUSE_INIT]		= { _cuse_lowlevel_init, "CUSE_INIT" },

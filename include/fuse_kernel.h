@@ -239,6 +239,10 @@
  *  7.45
  *  - add FUSE_COPY_FILE_RANGE_64
  *  - add struct fuse_copy_file_range_out
+ *
+ *  7.46 (proposed - not yet upstream)
+ *  - add FUSE_REMAP_FILE_RANGE for FICLONE/FICLONERANGE support
+ *  - add struct fuse_remap_file_range_in
  */
 
 #ifndef _LINUX_FUSE_H
@@ -662,6 +666,7 @@ enum fuse_opcode {
 	FUSE_TMPFILE		= 51,
 	FUSE_STATX		= 52,
 	FUSE_COPY_FILE_RANGE_64	= 53,
+	FUSE_REMAP_FILE_RANGE	= 54,
 
 	/* CUSE specific operations */
 	CUSE_INIT		= 4096,
@@ -1156,6 +1161,18 @@ struct fuse_copy_file_range_in {
 /* For FUSE_COPY_FILE_RANGE_64 */
 struct fuse_copy_file_range_out {
 	uint64_t	bytes_copied;
+};
+
+/* For FUSE_REMAP_FILE_RANGE (FICLONE/FICLONERANGE support) */
+struct fuse_remap_file_range_in {
+	uint64_t	fh_in;
+	uint64_t	off_in;
+	uint64_t	nodeid_out;
+	uint64_t	fh_out;
+	uint64_t	off_out;
+	uint64_t	len;
+	uint32_t	remap_flags;	/* REMAP_FILE_DEDUP, REMAP_FILE_CAN_SHORTEN */
+	uint32_t	padding;
 };
 
 #define FUSE_SETUPMAPPING_FLAG_WRITE (1ull << 0)
